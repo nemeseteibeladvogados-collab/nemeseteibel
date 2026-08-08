@@ -1,5 +1,5 @@
 ---
-title: 'SIGEF 2025 e o Novo Modelo INCRA: O Que Mudou na Regularização Fundiária'
+title: 'SIGEF 2025 e o Novo Modelo INCRA: O Que Mudou na Regularização Fundiária..'
 date: '22 Jun 2026'
 pubDate: 2026-06-22
 readTime: '8 min'
