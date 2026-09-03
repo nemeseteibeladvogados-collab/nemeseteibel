@@ -13,3 +13,6 @@ node_modules/
 
 # Pasta de trabalho/rascunho (referências e scaffolds locais)
 clonar/
+
+# Supabase CLI (estado local do link)
+supabase/.temp/

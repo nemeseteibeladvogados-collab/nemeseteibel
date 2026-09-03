@@ -1,0 +1,1277 @@
+---
+export const prerender = false;
+
+const user = Astro.locals.user;
+const supabase = Astro.locals.supabase;
+
+interface QuizQuestion {
+  text: string;
+  options: string[];
+}
+
+interface Quiz {
+  id: string;
+  name: string;
+  title: string;
+  subtitle: string | null;
+  source_tag: string;
+  service_interest: string | null;
+  questions: QuizQuestion[];
+  success_message: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+const { data: quizzes } = await supabase
+  .from('quizzes')
+  .select('*')
+  .order('created_at', { ascending: false });
+
+const quizList: Quiz[] = (quizzes ?? []).map((q: Quiz) => ({
+  ...q,
+  questions: Array.isArray(q.questions) ? q.questions : [],
+}));
+
+// Funil por quiz: quantos iniciaram e quantos concluíram
+const funnel: Record<string, { started: number; completed: number }> = {};
+
+if (quizList.length > 0) {
+  const { data: responses } = await supabase
+    .from('quiz_responses')
+    .select('quiz_id, status')
+    .in('quiz_id', quizList.map((q) => q.id));
+
+  (responses ?? []).forEach((row: { quiz_id: string; status: string }) => {
+    const entry = funnel[row.quiz_id] ?? (funnel[row.quiz_id] = { started: 0, completed: 0 });
+    entry.started += 1;
+    if (row.status === 'completed') entry.completed += 1;
+  });
+}
+
+const siteUrl = Astro.url.origin;
+---
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quizzes — Nemes & Teibel Admin</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Sans', system-ui, sans-serif;
+      background: #F0EDE6;
+      min-height: 100vh;
+      color: #3D3828;
+    }
+
+    .topbar {
+      background: #3A3426;
+      padding: 0 2rem;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .topbar-left { display: flex; align-items: center; gap: 1.5rem; }
+
+    .topbar-brand {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.05rem;
+      color: #F5F0E8;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .topbar-brand span { color: #B8972A; }
+
+    .topbar-nav { display: flex; gap: 0.25rem; }
+
+    .nav-link {
+      font-size: 0.82rem;
+      color: rgba(245, 240, 232, 0.6);
+      text-decoration: none;
+      padding: 0.35rem 0.75rem;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+
+    .nav-link:hover { color: #F5F0E8; background: rgba(245,240,232,0.08); }
+    .nav-link.active { color: #F5F0E8; background: rgba(245,240,232,0.12); }
+
+    .topbar-right { display: flex; align-items: center; gap: 1rem; }
+
+    .user-badge { font-size: 0.8rem; color: rgba(245, 240, 232, 0.65); }
+
+    .btn-logout {
+      background: transparent;
+      border: 1px solid rgba(245, 240, 232, 0.3);
+      color: #F5F0E8;
+      padding: 0.4rem 0.875rem;
+      border-radius: 50px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-logout:hover { background: rgba(245, 240, 232, 0.1); }
+
+    .hamburger {
+      display: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0.5rem;
+      color: #F5F0E8;
+    }
+
+    .hamburger svg { display: block; }
+
+    .mobile-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(58, 52, 38, 0.5);
+      z-index: 199;
+    }
+
+    .mobile-overlay.open { display: block; }
+
+    .mobile-drawer {
+      display: none;
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 260px;
+      height: 100%;
+      background: #3A3426;
+      z-index: 200;
+      padding: 1.25rem;
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+      overflow-y: auto;
+    }
+
+    .mobile-drawer.open {
+      display: block;
+      transform: translateX(0);
+    }
+
+    .drawer-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid rgba(245, 240, 232, 0.1);
+    }
+
+    .drawer-header span {
+      font-size: 0.8rem;
+      color: rgba(245, 240, 232, 0.65);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 170px;
+    }
+
+    .drawer-close {
+      background: none;
+      border: none;
+      color: #F5F0E8;
+      cursor: pointer;
+      padding: 0.25rem;
+    }
+
+    .drawer-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .drawer-nav a {
+      font-size: 0.9rem;
+      color: rgba(245, 240, 232, 0.7);
+      text-decoration: none;
+      padding: 0.7rem 0.75rem;
+      border-radius: 8px;
+      transition: all 0.2s;
+    }
+
+    .drawer-nav a:hover { color: #F5F0E8; background: rgba(245, 240, 232, 0.08); }
+    .drawer-nav a.active { color: #F5F0E8; background: rgba(245, 240, 232, 0.12); }
+
+    .drawer-logout .btn-logout {
+      width: 100%;
+      text-align: center;
+      padding: 0.6rem;
+    }
+
+    @media (max-width: 768px) {
+      .topbar { padding: 0 1rem; }
+      .topbar-nav { display: none; }
+      .topbar-right { display: none; }
+      .hamburger { display: block; }
+    }
+
+    .main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .page-header h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.75rem;
+      color: #3A3426;
+      font-weight: 700;
+    }
+
+    .page-header p {
+      font-size: 0.875rem;
+      color: #9A9285;
+      margin-top: 0.25rem;
+    }
+
+    .btn-primary {
+      background: #3A3426;
+      color: #F5F0E8;
+      border: none;
+      padding: 0.6rem 1.25rem;
+      border-radius: 50px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .btn-primary:hover { background: #4a4132; }
+
+    .table-card {
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 2px 8px rgba(58, 52, 38, 0.08);
+      overflow: hidden;
+    }
+
+    .table-header {
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid rgba(58, 52, 38, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .table-header h2 { font-size: 0.95rem; font-weight: 700; color: #3A3426; }
+
+    .count {
+      font-size: 0.78rem;
+      background: #F5F0E8;
+      color: #8C7355;
+      padding: 0.25rem 0.625rem;
+      border-radius: 50px;
+      font-weight: 600;
+    }
+
+    table { width: 100%; border-collapse: collapse; }
+
+    thead th {
+      text-align: left;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #9A9285;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 0.75rem 1.5rem;
+      border-bottom: 1px solid rgba(58, 52, 38, 0.08);
+    }
+
+    tbody tr { transition: background 0.15s; }
+    tbody tr:hover { background: #FAFAF8; }
+
+    tbody td {
+      padding: 0.875rem 1.5rem;
+      font-size: 0.875rem;
+      border-bottom: 1px solid rgba(58, 52, 38, 0.06);
+      color: #3D3828;
+    }
+
+    tbody tr:last-child td { border-bottom: none; }
+
+    .td-name { font-weight: 600; }
+    .td-tag { font-family: monospace; font-size: 0.78rem; color: #8C7355; background: #F5F0E8; padding: 0.2rem 0.5rem; border-radius: 4px; }
+
+    .funnel { display: inline-flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
+    .funnel-arrow { color: #C4BCAB; }
+    .funnel-rate {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #166534;
+      background: #F0FDF4;
+      border: 1px solid #BBF7D0;
+      padding: 0.1rem 0.45rem;
+      border-radius: 50px;
+    }
+    .funnel-rate.zero { color: #9A9285; background: #F5F0E8; border-color: #E5DDD0; }
+
+    .status-dot {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      margin-right: 0.4rem;
+    }
+
+    .actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
+    .btn-action {
+      padding: 0.35rem 0.7rem;
+      border-radius: 6px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1.5px solid transparent;
+      transition: all 0.15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    .btn-link {
+      background: #EFF6FF;
+      color: #1D4ED8;
+      border-color: #BFDBFE;
+    }
+
+    .btn-link:hover { background: #DBEAFE; }
+
+    .btn-iframe {
+      background: #F5F0E8;
+      color: #8C7355;
+      border-color: #E5DDD0;
+    }
+
+    .btn-iframe:hover { background: #EDE6D8; }
+
+    .btn-edit {
+      background: #FAF5FF;
+      color: #7E22CE;
+      border-color: #E9D5FF;
+    }
+
+    .btn-edit:hover { background: #F3E8FF; }
+
+    .btn-toggle-on {
+      background: #FEF9EE;
+      color: #B45309;
+      border-color: #FDE68A;
+    }
+
+    .btn-toggle-on:hover { background: #FEF3C7; }
+
+    .btn-toggle-off {
+      background: #F0FDF4;
+      color: #166534;
+      border-color: #BBF7D0;
+    }
+
+    .btn-toggle-off:hover { background: #DCFCE7; }
+
+    .btn-delete {
+      background: #FEF2F2;
+      color: #DC2626;
+      border-color: #FECACA;
+    }
+
+    .btn-delete:hover { background: #FEE2E2; }
+
+    .empty-state {
+      text-align: center;
+      padding: 3.5rem 1.5rem;
+      color: #9A9285;
+    }
+
+    .empty-state .icon { font-size: 2.25rem; margin-bottom: 0.75rem; }
+    .empty-state p { font-size: 0.875rem; }
+
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(58, 52, 38, 0.5);
+      backdrop-filter: blur(3px);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: #fff;
+      border-radius: 18px;
+      width: 100%;
+      max-width: 620px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 8px 40px rgba(58, 52, 38, 0.18);
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.5rem 1.75rem 1rem;
+      border-bottom: 1px solid rgba(58, 52, 38, 0.08);
+    }
+
+    .modal-header h2 {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #3A3426;
+    }
+
+    .btn-close {
+      background: none;
+      border: none;
+      font-size: 1.25rem;
+      color: #9A9285;
+      cursor: pointer;
+      padding: 0.25rem;
+      line-height: 1;
+      border-radius: 6px;
+      transition: background 0.15s;
+    }
+
+    .btn-close:hover { background: #F5F0E8; color: #3A3426; }
+
+    .modal-body { padding: 1.5rem 1.75rem; }
+
+    .form-grid { display: grid; gap: 1.1rem; }
+
+    .form-group { display: flex; flex-direction: column; gap: 0.35rem; }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .form-group label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #3A3426;
+    }
+
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+      padding: 0.65rem 0.875rem;
+      border: 1.5px solid rgba(58, 52, 38, 0.18);
+      border-radius: 9px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.875rem;
+      color: #3D3828;
+      background: #fafaf8;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+
+    .form-group input:focus,
+    .form-group textarea:focus,
+    .form-group select:focus {
+      border-color: #B8972A;
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(184, 151, 42, 0.1);
+    }
+
+    .form-group textarea { resize: vertical; min-height: 70px; }
+
+    .form-hint {
+      font-size: 0.73rem;
+      color: #9A9285;
+      margin-top: 0.1rem;
+    }
+
+    /* Builder de perguntas */
+    .builder {
+      border-top: 1px solid rgba(58, 52, 38, 0.08);
+      padding-top: 1.25rem;
+    }
+
+    .builder-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.85rem;
+    }
+
+    .builder-header h3 {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #3A3426;
+    }
+
+    .builder-header .form-hint { margin: 0.15rem 0 0; }
+
+    .btn-add-question {
+      background: #F5F0E8;
+      border: 1.5px solid #E5DDD0;
+      color: #8C7355;
+      padding: 0.4rem 0.85rem;
+      border-radius: 50px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+      flex-shrink: 0;
+    }
+
+    .btn-add-question:hover { background: #EDE6D8; }
+
+    .questions-list { display: flex; flex-direction: column; gap: 0.9rem; }
+
+    .question-item {
+      border: 1.5px solid rgba(58, 52, 38, 0.12);
+      border-radius: 12px;
+      padding: 0.9rem 1rem;
+      background: #FCFBF9;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .question-item-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .question-index {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #9A9285;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+    }
+
+    .btn-remove-question {
+      background: none;
+      border: none;
+      color: #DC2626;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 0.2rem 0.4rem;
+      border-radius: 6px;
+      transition: background 0.15s;
+    }
+
+    .btn-remove-question:hover { background: #FEF2F2; }
+
+    .question-item input,
+    .question-item textarea {
+      width: 100%;
+      padding: 0.6rem 0.8rem;
+      border: 1.5px solid rgba(58, 52, 38, 0.18);
+      border-radius: 9px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.85rem;
+      color: #3D3828;
+      background: #fff;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+
+    .question-item input:focus,
+    .question-item textarea:focus {
+      border-color: #B8972A;
+      box-shadow: 0 0 0 3px rgba(184, 151, 42, 0.1);
+    }
+
+    .question-item textarea {
+      resize: vertical;
+      min-height: 76px;
+      line-height: 1.6;
+    }
+
+    .builder-empty {
+      text-align: center;
+      padding: 1.5rem;
+      font-size: 0.82rem;
+      color: #9A9285;
+      border: 1.5px dashed rgba(58, 52, 38, 0.15);
+      border-radius: 12px;
+    }
+
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+      padding: 1rem 1.75rem 1.5rem;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      border: 1.5px solid rgba(58, 52, 38, 0.2);
+      color: #3A3426;
+      padding: 0.6rem 1.25rem;
+      border-radius: 50px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn-secondary:hover { background: #F5F0E8; }
+
+    .modal-error {
+      background: #FEF2F2;
+      border: 1px solid rgba(220, 38, 38, 0.2);
+      border-radius: 8px;
+      padding: 0.65rem 1rem;
+      font-size: 0.82rem;
+      color: #DC2626;
+      margin-bottom: 1rem;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      background: #3A3426;
+      color: #F5F0E8;
+      padding: 0.75rem 1.25rem;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      box-shadow: 0 4px 16px rgba(58, 52, 38, 0.3);
+      transform: translateY(8px);
+      opacity: 0;
+      transition: all 0.25s;
+      z-index: 999;
+      pointer-events: none;
+    }
+
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 768px) {
+      .main { padding: 1.25rem 1rem; }
+      .page-header h1 { font-size: 1.35rem; }
+
+      .table-card table,
+      .table-card thead,
+      .table-card tbody,
+      .table-card th,
+      .table-card td,
+      .table-card tr { display: block; }
+      .table-card thead { display: none; }
+      .table-card tbody tr {
+        padding: 1rem;
+        border-bottom: 1px solid rgba(58, 52, 38, 0.1);
+      }
+      .table-card tbody tr:last-child { border-bottom: none; }
+      .table-card tbody td {
+        padding: 0.25rem 0;
+        border-bottom: none;
+        font-size: 0.85rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .table-card tbody td::before {
+        content: attr(data-label);
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: #9A9285;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        min-width: 90px;
+        flex-shrink: 0;
+      }
+      .actions {
+        justify-content: flex-start;
+        margin-top: 0.5rem;
+      }
+      .modal {
+        max-width: 100%;
+        margin: 0.5rem;
+        border-radius: 14px;
+      }
+      .form-row { grid-template-columns: 1fr; }
+      .modal-header { padding: 1.25rem 1.25rem 0.75rem; }
+      .modal-body { padding: 1rem 1.25rem; }
+      .modal-footer { padding: 0.75rem 1.25rem 1.25rem; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-left">
+      <a href="/admin" class="topbar-brand">Nemes <span>&</span> Teibel — Admin</a>
+      <nav class="topbar-nav">
+        <a href="/admin" class="nav-link">Dashboard</a>
+        <a href="/admin/paginas" class="nav-link">Páginas</a>
+        <a href="/admin/materiais" class="nav-link">Materiais</a>
+        <a href="/admin/formularios" class="nav-link">Formulários</a>
+        <a href="/admin/quizzes" class="nav-link active">Quizzes</a>
+        <a href="/admin/usuarios" class="nav-link">Usuários</a>
+      </nav>
+    </div>
+    <div class="topbar-right">
+      <span class="user-badge">{user?.email}</span>
+      <form method="POST" action="/api/auth/logout">
+        <button type="submit" class="btn-logout">Sair</button>
+      </form>
+    </div>
+    <button class="hamburger" id="hamburger-btn" aria-label="Abrir menu">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+  </header>
+
+  <div class="mobile-overlay" id="mobile-overlay"></div>
+  <div class="mobile-drawer" id="mobile-drawer">
+    <div class="drawer-header">
+      <span>{user?.email}</span>
+      <button class="drawer-close" id="drawer-close" aria-label="Fechar menu">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <nav class="drawer-nav">
+      <a href="/admin">Dashboard</a>
+      <a href="/admin/paginas">Páginas</a>
+      <a href="/admin/materiais">Materiais</a>
+      <a href="/admin/formularios">Formulários</a>
+      <a href="/admin/quizzes" class="active">Quizzes</a>
+      <a href="/admin/usuarios">Usuários</a>
+    </nav>
+    <div class="drawer-logout">
+      <form method="POST" action="/api/auth/logout">
+        <button type="submit" class="btn-logout">Sair</button>
+      </form>
+    </div>
+  </div>
+
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <h1>Quizzes</h1>
+        <p>Crie quizzes multi-etapa que qualificam e capturam leads</p>
+      </div>
+      <button class="btn-primary" id="btn-open-modal">+ Novo quiz</button>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header">
+        <h2>Quizzes criados</h2>
+        <span class="count">{quizList.length} registros</span>
+      </div>
+
+      {quizList.length === 0 ? (
+        <div class="empty-state">
+          <div class="icon">🧭</div>
+          <p>Nenhum quiz criado ainda. Clique em "Novo quiz" para começar.</p>
+        </div>
+      ) : (
+        <table>
+          <thead>
+            <tr>
+              <th>Nome interno</th>
+              <th>Source tag</th>
+              <th>Perguntas</th>
+              <th>Funil</th>
+              <th>Status</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {quizList.map((q) => {
+              const stats = funnel[q.id] ?? { started: 0, completed: 0 };
+              const rate = stats.started > 0 ? Math.round((stats.completed / stats.started) * 100) : 0;
+              return (
+                <tr>
+                  <td class="td-name" data-label="Nome">{q.name}</td>
+                  <td data-label="Source tag"><span class="td-tag">{q.source_tag}</span></td>
+                  <td data-label="Perguntas">{q.questions.length}</td>
+                  <td data-label="Funil">
+                    <span class="funnel">
+                      {stats.started}
+                      <span class="funnel-arrow">→</span>
+                      {stats.completed}
+                      <span class="funnel-rate" class:list={[stats.started === 0 && 'zero']}>{rate}%</span>
+                    </span>
+                  </td>
+                  <td data-label="Status">
+                    <span class="status-dot" style={`background:${q.is_active ? '#3DBE4F' : '#9A9285'}`}></span>
+                    {q.is_active ? 'Ativo' : 'Inativo'}
+                  </td>
+                  <td data-label="Ações">
+                    <div class="actions">
+                      <button
+                        class="btn-action btn-link"
+                        data-copy={`${siteUrl}/q/${q.id}`}
+                        onclick="copyText(this)"
+                      >
+                        Link
+                      </button>
+                      <button
+                        class="btn-action btn-iframe"
+                        data-copy={`<iframe src="${siteUrl}/q/${q.id}?embed=1" width="100%" height="560" frameborder="0" style="border-radius:12px;border:none;" title="${q.title}"></iframe>`}
+                        onclick="copyText(this)"
+                      >
+                        Iframe
+                      </button>
+                      <button
+                        class="btn-action btn-edit"
+                        data-id={q.id}
+                        data-quiz={JSON.stringify({
+                          name: q.name,
+                          title: q.title,
+                          subtitle: q.subtitle ?? '',
+                          service_interest: q.service_interest ?? '',
+                          success_message: q.success_message,
+                          questions: q.questions,
+                        })}
+                        onclick="editQuiz(this)"
+                      >
+                        Editar perguntas
+                      </button>
+                      <button
+                        class="btn-action"
+                        class:list={[q.is_active ? 'btn-toggle-on' : 'btn-toggle-off']}
+                        data-id={q.id}
+                        data-active={String(q.is_active)}
+                        onclick="toggleQuiz(this)"
+                      >
+                        {q.is_active ? 'Desativar' : 'Ativar'}
+                      </button>
+                      <button
+                        class="btn-action btn-delete"
+                        data-id={q.id}
+                        data-name={q.name}
+                        onclick="deleteQuiz(this)"
+                      >
+                        Excluir
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </div>
+  </main>
+
+  <!-- Modal de criação / edição -->
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-header">
+        <h2 id="modal-title">Novo quiz</h2>
+        <button class="btn-close" id="btn-close-modal" aria-label="Fechar">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="modal-error" class="modal-error" style="display:none"></div>
+        <form id="quiz-form" class="form-grid" novalidate>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="q-name">Nome interno *</label>
+              <input type="text" id="q-name" placeholder="Ex: Quiz - Regularização" required />
+              <span class="form-hint">Visível apenas para você no painel</span>
+            </div>
+            <div class="form-group" id="group-source-tag">
+              <label for="q-source-tag">Source tag *</label>
+              <input type="text" id="q-source-tag" placeholder="quiz-regularizacao" required />
+              <span class="form-hint">Identificador único nos leads</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="q-title">Título público *</label>
+            <input type="text" id="q-title" placeholder="Ex: Quase lá! Onde enviamos seu resultado?" required />
+            <span class="form-hint">Exibido na última etapa, junto ao formulário</span>
+          </div>
+
+          <div class="form-group">
+            <label for="q-subtitle">Subtítulo</label>
+            <input type="text" id="q-subtitle" placeholder="Ex: Um especialista analisa seu caso em até 24h" />
+          </div>
+
+          <div class="form-group">
+            <label for="q-service">Serviço de interesse</label>
+            <input type="text" id="q-service" placeholder="Ex: regularizacao-fundiaria" />
+            <span class="form-hint">Salvo em cada lead captado por este quiz</span>
+          </div>
+
+          <div class="form-group">
+            <label for="q-success">Mensagem de sucesso</label>
+            <textarea id="q-success" placeholder="Obrigado! Entraremos em contato em breve."></textarea>
+          </div>
+
+          <div class="builder">
+            <div class="builder-header">
+              <div>
+                <h3>Perguntas</h3>
+                <p class="form-hint">Uma opção por linha, mínimo de 2 opções por pergunta</p>
+              </div>
+              <button type="button" class="btn-add-question" id="btn-add-question">+ Adicionar pergunta</button>
+            </div>
+            <div class="questions-list" id="questions-list"></div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="btn-cancel">Cancelar</button>
+        <button class="btn-primary" id="btn-save">Criar quiz</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    interface QuizQuestion { text: string; options: string[] }
+
+    const overlay = document.getElementById('modal-overlay')!;
+    const modalTitle = document.getElementById('modal-title')!;
+    const btnOpen = document.getElementById('btn-open-modal')!;
+    const btnClose = document.getElementById('btn-close-modal')!;
+    const btnCancel = document.getElementById('btn-cancel')!;
+    const btnSave = document.getElementById('btn-save') as HTMLButtonElement;
+    const btnAddQuestion = document.getElementById('btn-add-question')!;
+    const questionsList = document.getElementById('questions-list')!;
+    const groupSourceTag = document.getElementById('group-source-tag')!;
+    const modalError = document.getElementById('modal-error')!;
+    const toast = document.getElementById('toast')!;
+
+    let toastTimer: ReturnType<typeof setTimeout>;
+    let editingId: string | null = null;
+
+    function showToast(msg: string) {
+      toast.textContent = msg;
+      toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('show'), 2500);
+    }
+
+    function input(id: string) {
+      return document.getElementById(id) as HTMLInputElement;
+    }
+
+    // ----- Builder de perguntas -----
+    function addQuestion(question?: QuizQuestion) {
+      const item = document.createElement('div');
+      item.className = 'question-item';
+      item.innerHTML = `
+        <div class="question-item-header">
+          <span class="question-index"></span>
+          <button type="button" class="btn-remove-question">Remover</button>
+        </div>
+        <input type="text" class="q-text" placeholder="Enunciado da pergunta" />
+        <textarea class="q-options" placeholder="Opção 1&#10;Opção 2&#10;Opção 3"></textarea>
+      `;
+
+      (item.querySelector('.q-text') as HTMLInputElement).value = question?.text ?? '';
+      (item.querySelector('.q-options') as HTMLTextAreaElement).value = (question?.options ?? []).join('\n');
+
+      item.querySelector('.btn-remove-question')!.addEventListener('click', () => {
+        item.remove();
+        renumberQuestions();
+      });
+
+      questionsList.appendChild(item);
+      renumberQuestions();
+
+      if (!question) (item.querySelector('.q-text') as HTMLInputElement).focus();
+    }
+
+    function renumberQuestions() {
+      const items = Array.from(questionsList.querySelectorAll('.question-item'));
+      items.forEach((item, i) => {
+        item.querySelector('.question-index')!.textContent = `Pergunta ${i + 1}`;
+      });
+
+      const empty = questionsList.querySelector('.builder-empty');
+      if (items.length === 0 && !empty) {
+        const placeholder = document.createElement('div');
+        placeholder.className = 'builder-empty';
+        placeholder.textContent = 'Nenhuma pergunta ainda. Adicione a primeira.';
+        questionsList.appendChild(placeholder);
+      } else if (items.length > 0 && empty) {
+        empty.remove();
+      }
+    }
+
+    function collectQuestions(): QuizQuestion[] {
+      return Array.from(questionsList.querySelectorAll('.question-item')).map((item) => ({
+        text: (item.querySelector('.q-text') as HTMLInputElement).value.trim(),
+        options: (item.querySelector('.q-options') as HTMLTextAreaElement).value
+          .split('\n')
+          .map((o) => o.trim())
+          .filter(Boolean),
+      }));
+    }
+
+    function validateQuestions(questions: QuizQuestion[]): string | null {
+      if (questions.length === 0) return 'Adicione pelo menos uma pergunta.';
+      for (const [i, q] of questions.entries()) {
+        if (!q.text) return `A pergunta ${i + 1} está sem enunciado.`;
+        if (q.options.length < 2) return `A pergunta ${i + 1} precisa de pelo menos 2 opções.`;
+      }
+      return null;
+    }
+
+    btnAddQuestion.addEventListener('click', () => addQuestion());
+
+    // ----- Modal -----
+    function openModal() {
+      overlay.classList.add('open');
+      input('q-name').focus();
+    }
+
+    function openCreateModal() {
+      editingId = null;
+      modalTitle.textContent = 'Novo quiz';
+      btnSave.textContent = 'Criar quiz';
+      groupSourceTag.style.display = '';
+      (document.getElementById('quiz-form') as HTMLFormElement).reset();
+      delete input('q-source-tag').dataset.edited;
+      questionsList.innerHTML = '';
+      addQuestion();
+      modalError.style.display = 'none';
+      openModal();
+    }
+
+    function closeModal() {
+      overlay.classList.remove('open');
+      editingId = null;
+      modalError.style.display = 'none';
+    }
+
+    btnOpen.addEventListener('click', openCreateModal);
+    btnClose.addEventListener('click', closeModal);
+    btnCancel.addEventListener('click', closeModal);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+
+    // Auto-gerar source_tag a partir do nome interno
+    input('q-name').addEventListener('input', (e) => {
+      const tagInput = input('q-source-tag');
+      if (editingId || tagInput.dataset.edited) return;
+      tagInput.value = (e.target as HTMLInputElement).value
+        .toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-z0-9\s-]/g, '')
+        .trim()
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-');
+    });
+
+    input('q-source-tag').addEventListener('input', function () {
+      (this as HTMLInputElement).dataset.edited = '1';
+    });
+
+    function showError(msg: string) {
+      modalError.textContent = msg;
+      modalError.style.display = 'block';
+    }
+
+    btnSave.addEventListener('click', async () => {
+      modalError.style.display = 'none';
+
+      const name = input('q-name').value.trim();
+      const title = input('q-title').value.trim();
+      const subtitle = input('q-subtitle').value.trim() || null;
+      const sourceTag = input('q-source-tag').value.trim();
+      const service = input('q-service').value.trim() || null;
+      const successMsg = (document.getElementById('q-success') as HTMLTextAreaElement).value.trim()
+        || 'Obrigado! Entraremos em contato em breve.';
+
+      if (!name || !title || (!editingId && !sourceTag)) {
+        showError('Nome interno, título e source tag são obrigatórios.');
+        return;
+      }
+
+      const questions = collectQuestions();
+      const questionError = validateQuestions(questions);
+      if (questionError) {
+        showError(questionError);
+        return;
+      }
+
+      const originalLabel = btnSave.textContent;
+      btnSave.textContent = 'Salvando…';
+      btnSave.disabled = true;
+
+      const payload: Record<string, unknown> = {
+        name,
+        title,
+        subtitle,
+        service_interest: service,
+        success_message: successMsg,
+        questions,
+      };
+
+      try {
+        const res = editingId
+          ? await fetch(`/api/quizzes/${editingId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            })
+          : await fetch('/api/quizzes/create', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ...payload, source_tag: sourceTag }),
+            });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          showError(data.error ?? 'Erro ao salvar quiz.');
+          btnSave.textContent = originalLabel;
+          btnSave.disabled = false;
+          return;
+        }
+
+        const wasEditing = !!editingId;
+        closeModal();
+        showToast(wasEditing ? 'Quiz atualizado!' : 'Quiz criado com sucesso!');
+        setTimeout(() => location.reload(), 800);
+      } catch {
+        showError('Erro de conexão.');
+        btnSave.textContent = originalLabel;
+        btnSave.disabled = false;
+      }
+    });
+
+    // ----- Ações da tabela -----
+    function editQuiz(btn: HTMLButtonElement) {
+      const quiz = JSON.parse(btn.dataset.quiz ?? '{}');
+
+      editingId = btn.dataset.id ?? null;
+      modalTitle.textContent = 'Editar quiz';
+      btnSave.textContent = 'Salvar alterações';
+      groupSourceTag.style.display = 'none';
+
+      input('q-name').value = quiz.name ?? '';
+      input('q-title').value = quiz.title ?? '';
+      input('q-subtitle').value = quiz.subtitle ?? '';
+      input('q-service').value = quiz.service_interest ?? '';
+      (document.getElementById('q-success') as HTMLTextAreaElement).value = quiz.success_message ?? '';
+
+      questionsList.innerHTML = '';
+      (quiz.questions ?? []).forEach((q: QuizQuestion) => addQuestion(q));
+      renumberQuestions();
+
+      modalError.style.display = 'none';
+      openModal();
+    }
+
+    function copyText(btn: HTMLButtonElement) {
+      const text = btn.dataset.copy ?? '';
+      navigator.clipboard.writeText(text).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = 'Copiado!';
+        setTimeout(() => { btn.textContent = orig; }, 1800);
+      });
+    }
+
+    async function toggleQuiz(btn: HTMLButtonElement) {
+      const id = btn.dataset.id;
+      const active = btn.dataset.active === 'true';
+      btn.disabled = true;
+
+      const res = await fetch('/api/quizzes/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, is_active: !active }),
+      });
+
+      if (res.ok) {
+        showToast(active ? 'Quiz desativado.' : 'Quiz ativado.');
+        setTimeout(() => location.reload(), 600);
+      } else {
+        showToast('Erro ao alterar status.');
+        btn.disabled = false;
+      }
+    }
+
+    async function deleteQuiz(btn: HTMLButtonElement) {
+      const name = btn.dataset.name;
+      if (!confirm(`Excluir o quiz "${name}"?\n\nAs respostas registradas também serão removidas. Os leads já capturados não serão afetados.`)) return;
+
+      const id = btn.dataset.id;
+      btn.disabled = true;
+
+      const res = await fetch(`/api/quizzes/${id}`, { method: 'DELETE' });
+
+      if (res.ok) {
+        showToast('Quiz excluído.');
+        setTimeout(() => location.reload(), 600);
+      } else {
+        showToast('Erro ao excluir quiz.');
+        btn.disabled = false;
+      }
+    }
+
+    (window as any).copyText = copyText;
+    (window as any).editQuiz = editQuiz;
+    (window as any).toggleQuiz = toggleQuiz;
+    (window as any).deleteQuiz = deleteQuiz;
+
+    // Mobile drawer
+    const hamburger = document.getElementById('hamburger-btn');
+    const mobileOverlay = document.getElementById('mobile-overlay');
+    const drawer = document.getElementById('mobile-drawer');
+    const drawerClose = document.getElementById('drawer-close');
+
+    function openDrawer() {
+      mobileOverlay?.classList.add('open');
+      drawer?.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeDrawer() {
+      mobileOverlay?.classList.remove('open');
+      drawer?.classList.remove('open');
+      document.body.style.overflow = '';
+    }
+    hamburger?.addEventListener('click', openDrawer);
+    mobileOverlay?.addEventListener('click', closeDrawer);
+    drawerClose?.addEventListener('click', closeDrawer);
+  </script>
+</body>
+</html>

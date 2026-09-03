@@ -1,0 +1,645 @@
+---
+export const prerender = false;
+
+const { id } = Astro.params;
+const embed = Astro.url.searchParams.get('embed') === '1';
+
+const { data: quiz, error } = await Astro.locals.supabase
+  .from('quizzes')
+  .select('id, title, subtitle, questions, success_message')
+  .eq('id', id!)
+  .eq('is_active', true)
+  .single();
+
+if (error || !quiz) {
+  return Astro.redirect('/404');
+}
+
+interface QuizQuestion {
+  text: string;
+  options: string[];
+}
+
+const questions: QuizQuestion[] = Array.isArray(quiz.questions) ? quiz.questions : [];
+const totalSteps = questions.length + 1;
+---
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17888765664"></script>
+  <script is:inline>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'AW-17888765664');
+  </script>
+
+  <title>{quiz.title} — Nemes & Teibel Advogados</title>
+  <meta name="robots" content="noindex" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --gold: #B8972A;
+      --dark: #3A3426;
+      --cream: #F5F0E8;
+      --bg: #F0EDE6;
+      --muted: #9A9285;
+      --text: #3D3828;
+      --error: #C0392B;
+      --success-bg: #F0F9F4;
+      --success-color: #1E7E4A;
+    }
+
+    body {
+      font-family: 'DM Sans', system-ui, sans-serif;
+      background: var(--bg);
+      min-height: 100vh;
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+    }
+
+    body.embed {
+      background: transparent;
+      min-height: unset;
+    }
+
+    .page-wrapper {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 1.5rem;
+    }
+
+    .embed .page-wrapper {
+      padding: 1.25rem;
+      justify-content: flex-start;
+    }
+
+    .brand {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .brand-name {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.2rem;
+      color: var(--dark);
+      font-weight: 700;
+    }
+
+    .brand-name span { color: var(--gold); }
+
+    .brand-tagline {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 0.2rem;
+      letter-spacing: 0.04em;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 4px 24px rgba(58, 52, 38, 0.1);
+      padding: 2.5rem 2rem;
+      width: 100%;
+      max-width: 480px;
+    }
+
+    .embed .card {
+      box-shadow: none;
+      border-radius: 12px;
+      padding: 1.75rem 1.5rem;
+      border: 1px solid rgba(58, 52, 38, 0.1);
+    }
+
+    .progress {
+      margin-bottom: 1.5rem;
+    }
+
+    .progress-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.5rem;
+    }
+
+    .progress-track {
+      height: 5px;
+      background: rgba(58, 52, 38, 0.1);
+      border-radius: 50px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0;
+      background: var(--gold);
+      border-radius: 50px;
+      transition: width 0.35s ease;
+    }
+
+    .card-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--dark);
+      line-height: 1.3;
+      margin-bottom: 0.375rem;
+    }
+
+    .card-subtitle {
+      font-size: 0.875rem;
+      color: var(--muted);
+      line-height: 1.6;
+      margin-bottom: 1.75rem;
+    }
+
+    .step { display: none; }
+    .step.active { display: block; animation: fade-in 0.25s ease; }
+
+    @keyframes fade-in {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: none; }
+    }
+
+    .question-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--dark);
+      line-height: 1.35;
+      margin-bottom: 1.25rem;
+    }
+
+    .options {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .option {
+      width: 100%;
+      text-align: left;
+      padding: 0.85rem 1rem;
+      border: 1.5px solid rgba(58, 52, 38, 0.18);
+      border-radius: 11px;
+      background: #fafaf8;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--text);
+      cursor: pointer;
+      transition: border-color 0.18s, background 0.18s, box-shadow 0.18s;
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+    }
+
+    .option:hover {
+      border-color: var(--gold);
+      background: #fff;
+    }
+
+    .option-marker {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(58, 52, 38, 0.25);
+      flex-shrink: 0;
+      position: relative;
+      transition: border-color 0.18s;
+    }
+
+    .option.selected {
+      border-color: var(--gold);
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(184, 151, 42, 0.1);
+    }
+
+    .option.selected .option-marker { border-color: var(--gold); }
+
+    .option.selected .option-marker::after {
+      content: '';
+      position: absolute;
+      inset: 3px;
+      border-radius: 50%;
+      background: var(--gold);
+    }
+
+    .btn-back {
+      background: none;
+      border: none;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 0.4rem 0;
+      margin-top: 1.25rem;
+      transition: color 0.2s;
+    }
+
+    .btn-back:hover { color: var(--dark); }
+
+    .field { margin-bottom: 1.1rem; }
+
+    label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--dark);
+      margin-bottom: 0.4rem;
+      letter-spacing: 0.01em;
+    }
+
+    input {
+      width: 100%;
+      padding: 0.7rem 0.9rem;
+      border: 1.5px solid rgba(58, 52, 38, 0.18);
+      border-radius: 9px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.9rem;
+      color: var(--text);
+      background: #fafaf8;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: var(--gold);
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(184, 151, 42, 0.1);
+    }
+
+    input.invalid {
+      border-color: var(--error);
+      box-shadow: 0 0 0 3px rgba(192, 57, 43, 0.08);
+    }
+
+    .field-error {
+      font-size: 0.75rem;
+      color: var(--error);
+      margin-top: 0.3rem;
+      min-height: 1rem;
+    }
+
+    .btn-submit {
+      width: 100%;
+      padding: 0.85rem;
+      background: var(--dark);
+      color: var(--cream);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      margin-top: 0.5rem;
+    }
+
+    .btn-submit:hover { background: #4a4132; }
+    .btn-submit:active { transform: scale(0.99); }
+    .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .form-error {
+      background: #FEF2F2;
+      border: 1px solid rgba(192, 57, 43, 0.25);
+      border-radius: 9px;
+      padding: 0.75rem 1rem;
+      font-size: 0.82rem;
+      color: var(--error);
+      margin-top: 0.75rem;
+    }
+
+    .success-state {
+      text-align: center;
+      padding: 1.5rem 0 0.5rem;
+    }
+
+    .success-icon {
+      font-size: 2.5rem;
+      display: block;
+      margin-bottom: 0.75rem;
+    }
+
+    .success-msg {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--success-color);
+      line-height: 1.5;
+    }
+
+    .success-sub {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 0.4rem;
+    }
+
+    .privacy-note {
+      text-align: center;
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 1.25rem;
+    }
+
+    .footer-link {
+      display: block;
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-decoration: none;
+      margin-top: 1.5rem;
+      opacity: 0.7;
+    }
+
+    .footer-link:hover { opacity: 1; }
+  </style>
+</head>
+<body class={embed ? 'embed' : ''}>
+  <div class="page-wrapper">
+    {!embed && (
+      <div class="brand">
+        <div class="brand-name">Nemes <span>&</span> Teibel</div>
+        <div class="brand-tagline">Advogados Associados</div>
+      </div>
+    )}
+
+    <div class="card">
+      <div id="quiz-wrapper">
+        <div class="progress">
+          <div class="progress-label">
+            <span id="progress-step">Pergunta 1 de {questions.length}</span>
+            <span id="progress-pct">0%</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="progress-fill"></div>
+          </div>
+        </div>
+
+        {questions.map((q, i) => (
+          <div class="step" data-step={i}>
+            <h2 class="question-title">{q.text}</h2>
+            <div class="options">
+              {q.options.map((opt) => (
+                <button type="button" class="option" data-question={i} data-value={opt}>
+                  <span class="option-marker"></span>
+                  <span>{opt}</span>
+                </button>
+              ))}
+            </div>
+            {i > 0 && <button type="button" class="btn-back" data-back>← Voltar</button>}
+          </div>
+        ))}
+
+        <div class="step" data-step={questions.length}>
+          <h1 class="card-title">{quiz.title}</h1>
+          {quiz.subtitle && <p class="card-subtitle">{quiz.subtitle}</p>}
+
+          <form id="lead-form" novalidate>
+            <div class="field">
+              <label for="name">Nome completo *</label>
+              <input type="text" id="name" name="name" placeholder="Seu nome" autocomplete="name" />
+              <div class="field-error" id="err-name"></div>
+            </div>
+
+            <div class="field">
+              <label for="email">E-mail</label>
+              <input type="email" id="email" name="email" placeholder="seu@email.com" autocomplete="email" />
+              <div class="field-error" id="err-email"></div>
+            </div>
+
+            <div class="field">
+              <label for="phone">WhatsApp</label>
+              <input type="tel" id="phone" name="phone" placeholder="(00) 00000-0000" autocomplete="tel" maxlength="15" />
+              <div class="field-error" id="err-phone"></div>
+            </div>
+
+            <div class="field-error" id="err-general" style="margin-top:0.25rem"></div>
+
+            <button type="submit" class="btn-submit" id="btn-submit">Ver meu resultado</button>
+
+            <div id="form-error" class="form-error" style="display:none"></div>
+          </form>
+
+          {questions.length > 0 && <button type="button" class="btn-back" data-back>← Voltar</button>}
+
+          <p class="privacy-note">Seus dados são protegidos e usados apenas para retorno do escritório.</p>
+        </div>
+      </div>
+
+      <div id="success-wrapper" style="display:none" class="success-state">
+        <span class="success-icon">✓</span>
+        <p class="success-msg" id="success-msg">{quiz.success_message}</p>
+        <p class="success-sub">Entraremos em contato o mais breve possível.</p>
+      </div>
+    </div>
+
+    {!embed && (
+      <a href="/" class="footer-link">nemeseteibel.adv.br</a>
+    )}
+  </div>
+
+  <script define:vars={{ quizId: quiz.id, questionCount: questions.length, totalSteps, successMessage: quiz.success_message }}>
+    const steps = Array.from(document.querySelectorAll('.step'));
+    const progressFill = document.getElementById('progress-fill');
+    const progressStep = document.getElementById('progress-step');
+    const progressPct = document.getElementById('progress-pct');
+    const quizWrapper = document.getElementById('quiz-wrapper');
+    const successWrapper = document.getElementById('success-wrapper');
+    const successMsg = document.getElementById('success-msg');
+    const phoneInput = document.getElementById('phone');
+    const leadForm = document.getElementById('lead-form');
+    const btn = document.getElementById('btn-submit');
+    const formError = document.getElementById('form-error');
+
+    const answers = new Array(questionCount).fill(null);
+    let current = 0;
+    let responseId = null;
+    let startSent = false;
+
+    function render() {
+      steps.forEach((step, i) => step.classList.toggle('active', i === current));
+
+      const pct = Math.round(((current + 1) / totalSteps) * 100);
+      progressFill.style.width = pct + '%';
+      progressPct.textContent = pct + '%';
+      progressStep.textContent = current < questionCount
+        ? `Pergunta ${current + 1} de ${questionCount}`
+        : 'Último passo';
+
+      if (current < questionCount) {
+        const chosen = answers[current];
+        steps[current].querySelectorAll('.option').forEach((opt) => {
+          opt.classList.toggle('selected', !!chosen && opt.dataset.value === chosen);
+        });
+      } else {
+        document.getElementById('name').focus({ preventScroll: true });
+      }
+    }
+
+    async function sendStart() {
+      if (startSent) return;
+      startSent = true;
+      try {
+        const res = await fetch(`/api/quizzes/${quizId}/start`, { method: 'POST' });
+        if (res.ok) responseId = (await res.json()).response_id ?? null;
+      } catch {
+        // O funil é best-effort: falhar aqui não pode bloquear o quiz.
+      }
+    }
+
+    document.querySelectorAll('.option').forEach((optBtn) => {
+      optBtn.addEventListener('click', () => {
+        const index = Number(optBtn.dataset.question);
+        answers[index] = optBtn.dataset.value;
+
+        steps[index].querySelectorAll('.option').forEach((o) => o.classList.remove('selected'));
+        optBtn.classList.add('selected');
+
+        sendStart();
+
+        setTimeout(() => {
+          current = Math.min(index + 1, steps.length - 1);
+          render();
+        }, 220);
+      });
+    });
+
+    document.querySelectorAll('[data-back]').forEach((backBtn) => {
+      backBtn.addEventListener('click', () => {
+        current = Math.max(0, current - 1);
+        render();
+      });
+    });
+
+    phoneInput.addEventListener('input', () => {
+      let v = phoneInput.value.replace(/\D/g, '').slice(0, 11);
+      if (v.length === 0) { phoneInput.value = ''; return; }
+      if (v.length <= 2) v = `(${v}`;
+      else if (v.length <= 6) v = `(${v.slice(0,2)}) ${v.slice(2)}`;
+      else if (v.length <= 10) v = `(${v.slice(0,2)}) ${v.slice(2,6)}-${v.slice(6)}`;
+      else v = `(${v.slice(0,2)}) ${v.slice(2,7)}-${v.slice(7)}`;
+      phoneInput.value = v;
+    });
+
+    function setErr(id, msg) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = msg;
+      const input = el.previousElementSibling;
+      if (input && input.tagName === 'INPUT') {
+        if (msg) input.classList.add('invalid');
+        else input.classList.remove('invalid');
+      }
+    }
+
+    function clearErrors() {
+      ['err-name', 'err-email', 'err-phone', 'err-general'].forEach(id => setErr(id, ''));
+      formError.style.display = 'none';
+    }
+
+    leadForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearErrors();
+
+      const missing = answers.findIndex((a) => !a);
+      if (missing !== -1) {
+        current = missing;
+        render();
+        return;
+      }
+
+      const name = document.getElementById('name').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const phone = document.getElementById('phone').value.trim();
+
+      let valid = true;
+
+      if (!name || name.length < 2) {
+        setErr('err-name', 'Nome é obrigatório (mínimo 2 caracteres).');
+        valid = false;
+      }
+
+      if (!email && !phone) {
+        setErr('err-general', 'Informe pelo menos e-mail ou WhatsApp.');
+        valid = false;
+      }
+
+      if (email) {
+        const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRe.test(email)) {
+          setErr('err-email', 'E-mail inválido.');
+          valid = false;
+        }
+      }
+
+      if (phone) {
+        const digits = phone.replace(/\D/g, '');
+        if (digits.length < 10) {
+          setErr('err-phone', 'WhatsApp inválido (mínimo 10 dígitos).');
+          valid = false;
+        }
+      }
+
+      if (!valid) return;
+
+      btn.disabled = true;
+      btn.textContent = 'Enviando…';
+
+      try {
+        const res = await fetch(`/api/quizzes/${quizId}/submit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name,
+            email: email || undefined,
+            phone: phone || undefined,
+            answers,
+            response_id: responseId ?? undefined,
+          }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          formError.textContent = data.error ?? 'Erro ao enviar. Tente novamente.';
+          formError.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'Ver meu resultado';
+          return;
+        }
+
+        successMsg.textContent = successMessage;
+        quizWrapper.style.display = 'none';
+        successWrapper.style.display = 'block';
+      } catch {
+        formError.textContent = 'Erro de conexão. Verifique sua internet e tente novamente.';
+        formError.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Ver meu resultado';
+      }
+    });
+
+    render();
+  </script>
+</body>
+</html>

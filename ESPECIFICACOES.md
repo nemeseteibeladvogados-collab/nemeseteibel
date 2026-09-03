@@ -113,11 +113,15 @@ nemeseteibel/
 |   |   |-- f/
 |   |   |   |-- [id].astro            # formulario publico (renderizado por ID)
 |   |   |
+|   |   |-- q/
+|   |   |   |-- [id].astro            # quiz publico multi-etapa (renderizado por ID)
+|   |   |
 |   |   |-- admin/
 |   |   |   |-- login.astro           # tela de login
 |   |   |   |-- index.astro           # dashboard
 |   |   |   |-- paginas.astro         # gerenciamento de paginas
 |   |   |   |-- formularios/index.astro # gerenciamento de formularios
+|   |   |   |-- quizzes.astro         # gerenciamento de quizzes
 |   |   |   |-- materiais.astro       # gerenciamento de materiais
 |   |   |   |-- usuarios.astro        # gerenciamento de admins
 |   |   |
@@ -128,6 +132,11 @@ nemeseteibel/
 |   |       |-- forms/toggle.ts
 |   |       |-- forms/[id].ts
 |   |       |-- forms/[id]/submit.ts
+|       |-- quizzes/create.ts
+|       |-- quizzes/toggle.ts
+|       |-- quizzes/[id].ts
+|       |-- quizzes/[id]/start.ts
+|       |-- quizzes/[id]/submit.ts
 |   |       |-- materials/upload.ts
 |   |       |-- materials/toggle.ts
 |   |       |-- materials/download.ts
@@ -136,6 +145,9 @@ nemeseteibel/
 |   |
 |   |-- styles/
 |       |-- global.css         # estilos globais
+|
+|-- supabase/
+|   |-- migrations/            # historico de migrations (supabase db push)
 |
 |-- astro.config.mjs           # configuracao do Astro
 |-- package.json
@@ -255,6 +267,12 @@ Isso permite que o admin desative qualquer landing page, artigo ou pagina de per
 - Suporta modo embed (`?embed=1`) para usar como iframe
 - Envia dados para `/api/forms/[id]/submit`
 
+### Quiz Publico (`/q/[id]`)
+- Renderiza quiz multi-etapa criado pelo admin (uma pergunta por vez + barra de progresso)
+- Ultima etapa e o formulario de lead (nome + email/whatsapp), seguido da tela de sucesso
+- Suporta modo embed (`?embed=1`) para usar como iframe
+- Marca o inicio do funil em `/api/quizzes/[id]/start` e conclui em `/api/quizzes/[id]/submit`
+
 ### Pagina Indisponivel (`/indisponivel`)
 - Exibida quando uma pagina foi desativada pelo admin
 - Mostra mensagem amigavel com link para voltar ao site
@@ -298,6 +316,17 @@ Todas as paginas do admin sao SSR (`prerender = false`) e protegidas pelo middle
 - **Acoes por formulario:**
   - Copiar link publico (`/f/{id}`)
   - Copiar codigo iframe (para embed externo)
+  - Ativar/desativar
+  - Excluir
+
+### Quizzes (`/admin/quizzes`)
+- **Criar quiz:** nome interno, source tag (auto-gerado), titulo publico, subtitulo, servico de interesse, mensagem de sucesso
+- **Builder de perguntas:** adicionar/remover perguntas, uma opcao por linha (minimo 2 opcoes por pergunta)
+- **Listar quizzes** com numero de perguntas e funil (inicio -> conclusao + taxa)
+- **Acoes por quiz:**
+  - Copiar link publico (`/q/{id}`)
+  - Copiar codigo iframe (para embed externo)
+  - Editar perguntas e textos
   - Ativar/desativar
   - Excluir
 
@@ -348,6 +377,20 @@ Todos os endpoints sao SSR (`prerender = false`).
 | POST   | `/api/forms/[id]/submit`    | Nao  | Submete lead pelo formulario publico|
 
 **Submit do formulario publico:** valida nome (min 2 chars), exige email ou telefone, verifica se formulario existe e esta ativo, salva como contato com source_tag do formulario.
+
+### Quizzes
+
+| Metodo | Rota                         | Auth | Descricao                            |
+| ------ | ---------------------------- | ---- | ------------------------------------ |
+| POST   | `/api/quizzes/create`        | Sim  | Cria novo quiz (com perguntas)       |
+| POST   | `/api/quizzes/toggle`        | Sim  | Ativa/desativa quiz                  |
+| GET    | `/api/quizzes/[id]`          | Nao  | Retorna dados publicos do quiz       |
+| PATCH  | `/api/quizzes/[id]`          | Sim  | Atualiza perguntas e textos do quiz  |
+| DELETE | `/api/quizzes/[id]`          | Sim  | Exclui quiz (e suas respostas)       |
+| POST   | `/api/quizzes/[id]/start`    | Nao  | Registra inicio do quiz (funil)      |
+| POST   | `/api/quizzes/[id]/submit`   | Nao  | Conclui o quiz e submete o lead      |
+
+**Submit do quiz publico:** mesma validacao do formulario, exige todas as perguntas respondidas, salva o lead em `contacts` (source_tag do quiz, respostas resumidas em `message`) e conclui a linha em `quiz_responses` com as respostas estruturadas.
 
 ### Materiais
 
@@ -403,6 +446,31 @@ Todos os endpoints sao SSR (`prerender = false`).
 | is_active        | boolean  | Se o formulario esta ativo              |
 | created_at       | timestamp| Data de criacao                         |
 
+### `quizzes`
+| Coluna           | Tipo     | Descricao                               |
+| ---------------- | -------- | --------------------------------------- |
+| id               | uuid     | PK                                      |
+| name             | text     | Nome interno (visivel so no admin)      |
+| title            | text     | Titulo publico (etapa final)            |
+| subtitle         | text?    | Subtitulo                               |
+| source_tag       | text     | Tag unica para identificar leads (unique) |
+| service_interest | text?    | Servico vinculado                       |
+| questions        | jsonb    | `[{ "text": "...", "options": [...] }]` |
+| success_message  | text     | Mensagem de sucesso apos envio          |
+| is_active        | boolean  | Se o quiz esta ativo                    |
+| created_at       | timestamp| Data de criacao                         |
+
+### `quiz_responses`
+| Coluna       | Tipo      | Descricao                                    |
+| ------------ | --------- | -------------------------------------------- |
+| id           | uuid      | PK                                           |
+| quiz_id      | uuid      | FK -> quizzes (on delete cascade)            |
+| contact_id   | uuid?     | FK -> contacts                               |
+| answers      | jsonb     | `[{ "question": "...", "answer": "..." }]`   |
+| status       | text      | "started" ou "completed" (funil)             |
+| started_at   | timestamp | Inicio do quiz                               |
+| completed_at | timestamp?| Conclusao do quiz                            |
+
 ### `materials`
 | Coluna           | Tipo     | Descricao                               |
 | ---------------- | -------- | --------------------------------------- |
@@ -449,6 +517,8 @@ Todos os endpoints sao SSR (`prerender = false`).
 - `materials`: leitura publica de materiais ativos, escrita para admins
 - `material_downloads`: insercao publica, leitura para admins
 - `forms`: leitura publica de formularios ativos, CRUD para admins
+- `quizzes`: leitura publica de quizzes ativos, CRUD para admins
+- `quiz_responses`: insercao publica e update das linhas iniciadas, leitura para admins
 - `page_settings`: leitura publica, escrita para admins
 
 ---
@@ -501,7 +571,16 @@ Visitante acessa link ou iframe -> preenche nome + email/telefone
 -> POST /api/forms/{id}/submit -> salva em contacts (source: source_tag do form)
 ```
 
-### 3. Via Download de Material
+### 3. Via Quiz Dinamico
+```
+Admin cria quiz no painel -> gera link /q/{id}
+Visitante responde as perguntas -> POST /api/quizzes/{id}/start (funil: inicio)
+-> preenche nome + email/telefone na ultima etapa
+-> POST /api/quizzes/{id}/submit -> salva em contacts (source: source_tag do quiz)
+-> conclui a linha em quiz_responses com as respostas (funil: conclusao)
+```
+
+### 4. Via Download de Material
 ```
 Admin faz upload de material -> publica na pagina /materiais
 Visitante preenche dados para baixar -> POST /api/materials/download

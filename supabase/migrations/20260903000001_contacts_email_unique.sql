@@ -1,0 +1,14 @@
+-- ============================================================
+-- Correção: contacts.email não tinha índice UNIQUE.
+--
+-- `/api/forms/[id]/submit`, `/api/materials/download` e o novo
+-- `/api/quizzes/[id]/submit` usam upsert com onConflict: 'email'.
+-- Sem o índice UNIQUE o Postgres devolve 42P10 ("no unique or
+-- exclusion constraint matching the ON CONFLICT specification") e,
+-- como os endpoints não checam o erro, todo lead que informava
+-- e-mail era silenciosamente descartado.
+--
+-- O índice não-único idx_contacts_email continua servindo às buscas
+-- do painel; este substitui a necessidade dele para o upsert.
+-- ============================================================
+CREATE UNIQUE INDEX IF NOT EXISTS idx_contacts_email_unique ON contacts(email);
