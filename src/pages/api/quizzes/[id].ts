@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { normalizeQuestions } from './create';
+import { normalizeQuestions, normalizeWhatsapp } from './create';
 
 export const prerender = false;
 
@@ -9,7 +9,7 @@ export const GET: APIRoute = async ({ params, locals }) => {
 
   const { data: quiz, error } = await locals.supabase
     .from('quizzes')
-    .select('id, title, subtitle, questions, success_message')
+    .select('id, title, subtitle, questions, success_message, whatsapp_number')
     .eq('id', id)
     .eq('is_active', true)
     .single();
@@ -49,10 +49,14 @@ export const PATCH: APIRoute = async ({ params, request, locals }) => {
     }
   }
 
-  for (const field of ['subtitle', 'service_interest'] as const) {
+  for (const field of ['subtitle', 'service_interest', 'meta_title', 'meta_description', 'og_image'] as const) {
     if (body[field] !== undefined) {
       patch[field] = String(body[field] ?? '').trim() || null;
     }
+  }
+
+  if (body.whatsapp_number !== undefined) {
+    patch.whatsapp_number = normalizeWhatsapp(body.whatsapp_number as string | null);
   }
 
   if (body.success_message !== undefined) {

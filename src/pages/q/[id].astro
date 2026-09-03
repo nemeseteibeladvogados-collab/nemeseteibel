@@ -6,7 +6,7 @@ const embed = Astro.url.searchParams.get('embed') === '1';
 
 const { data: quiz, error } = await Astro.locals.supabase
   .from('quizzes')
-  .select('id, title, subtitle, questions, success_message')
+  .select('id, title, subtitle, questions, success_message, whatsapp_number, meta_title, meta_description, og_image')
   .eq('id', id!)
   .eq('is_active', true)
   .single();
@@ -22,6 +22,18 @@ interface QuizQuestion {
 
 const questions: QuizQuestion[] = Array.isArray(quiz.questions) ? quiz.questions : [];
 const totalSteps = questions.length + 1;
+
+// Sem número próprio, cai no número do escritório usado no resto do site.
+const whatsappNumber = (quiz.whatsapp_number ?? '').replace(/\D/g, '') || '556541410010';
+
+// Preview de compartilhamento. `title` é o texto da etapa final, então
+// só serve de fallback: o ideal é o quiz ter meta_title preenchido.
+const metaTitle = quiz.meta_title?.trim() || quiz.title;
+const metaDescription = quiz.meta_description?.trim()
+  || quiz.subtitle?.trim()
+  || 'Responda algumas perguntas rápidas e receba a orientação de uma advogada especialista em direito agrário e ambiental.';
+const ogImage = new URL(quiz.og_image?.trim() || '/images/og-quiz.jpg', Astro.site ?? Astro.url.origin);
+const canonicalURL = new URL(Astro.url.pathname, Astro.site ?? Astro.url.origin);
 ---
 
 <!DOCTYPE html>
@@ -40,8 +52,26 @@ const totalSteps = questions.length + 1;
     gtag('config', 'AW-17888765664');
   </script>
 
-  <title>{quiz.title} — Nemes & Teibel Advogados</title>
+  <title>{metaTitle} — Nemes & Teibel Advogados</title>
+  <meta name="description" content={metaDescription} />
   <meta name="robots" content="noindex" />
+
+  <!-- Open Graph (preview no WhatsApp, Instagram, Facebook, LinkedIn) -->
+  <meta property="og:type"        content="website" />
+  <meta property="og:url"         content={canonicalURL} />
+  <meta property="og:site_name"   content="Nemes & Teibel Advogados" />
+  <meta property="og:title"       content={metaTitle} />
+  <meta property="og:description" content={metaDescription} />
+  <meta property="og:image"       content={ogImage} />
+  <meta property="og:image:width"  content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:locale"      content="pt_BR" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card"        content="summary_large_image" />
+  <meta name="twitter:title"       content={metaTitle} />
+  <meta name="twitter:description" content={metaDescription} />
+  <meta name="twitter:image"       content={ogImage} />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
@@ -354,6 +384,34 @@ const totalSteps = questions.length + 1;
       margin-top: 0.4rem;
     }
 
+    .btn-whatsapp {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      width: 100%;
+      margin-top: 1.5rem;
+      padding: 0.85rem;
+      background: #25D366;
+      color: #fff;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 600;
+      text-decoration: none;
+      border-radius: 50px;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    .btn-whatsapp:hover { background: #1FAF53; }
+    .btn-whatsapp:active { transform: scale(0.99); }
+    .btn-whatsapp svg { flex-shrink: 0; }
+
+    .whatsapp-note {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 0.6rem;
+    }
+
     .privacy-note {
       text-align: center;
       font-size: 0.72rem;
@@ -450,6 +508,12 @@ const totalSteps = questions.length + 1;
         <span class="success-icon">✓</span>
         <p class="success-msg" id="success-msg">{quiz.success_message}</p>
         <p class="success-sub">Entraremos em contato o mais breve possível.</p>
+
+        <a id="btn-whatsapp" class="btn-whatsapp" href="#" target="_blank" rel="noopener noreferrer">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.149-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884a9.82 9.82 0 016.988 2.896 9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.885-9.885 9.885M20.52 3.449C18.24 1.245 15.24 0 12.045 0 5.463 0 .104 5.334.101 11.892c0 2.096.549 4.142 1.595 5.945L0 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.582 0 11.94-5.334 11.943-11.893A11.821 11.821 0 0020.52 3.45"/></svg>
+          Enviar minhas respostas no WhatsApp
+        </a>
+        <p class="whatsapp-note">Abre uma conversa já com suas respostas escritas.</p>
       </div>
     </div>
 
@@ -458,7 +522,7 @@ const totalSteps = questions.length + 1;
     )}
   </div>
 
-  <script define:vars={{ quizId: quiz.id, questionCount: questions.length, totalSteps, successMessage: quiz.success_message }}>
+  <script define:vars={{ quizId: quiz.id, questionCount: questions.length, totalSteps, successMessage: quiz.success_message, quizTitle: metaTitle, whatsappNumber, questionTexts: questions.map((q) => q.text) }}>
     const steps = Array.from(document.querySelectorAll('.step'));
     const progressFill = document.getElementById('progress-fill');
     const progressStep = document.getElementById('progress-step');
@@ -470,6 +534,7 @@ const totalSteps = questions.length + 1;
     const leadForm = document.getElementById('lead-form');
     const btn = document.getElementById('btn-submit');
     const formError = document.getElementById('form-error');
+    const btnWhatsapp = document.getElementById('btn-whatsapp');
 
     const answers = new Array(questionCount).fill(null);
     let current = 0;
@@ -627,6 +692,10 @@ const totalSteps = questions.length + 1;
           btn.textContent = 'Ver meu resultado';
           return;
         }
+
+        const linhas = answers.map((a, i) => `${i + 1}. ${questionTexts[i]}\n→ ${a}`).join('\n\n');
+        const texto = `Vim pelo site! Respondi o quiz "${quizTitle}".\n\nMeu nome: ${name}\n\n${linhas}`;
+        btnWhatsapp.href = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(texto)}`;
 
         successMsg.textContent = successMessage;
         quizWrapper.style.display = 'none';

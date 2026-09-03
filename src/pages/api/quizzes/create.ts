@@ -18,7 +18,10 @@ export const POST: APIRoute = async ({ request, locals }) => {
     return json({ error: 'Corpo inválido.' }, 400);
   }
 
-  const { name, title, subtitle, source_tag, service_interest, success_message } = body as Record<string, string | null>;
+  const {
+    name, title, subtitle, source_tag, service_interest, success_message,
+    whatsapp_number, meta_title, meta_description, og_image,
+  } = body as Record<string, string | null>;
 
   if (!name?.trim() || !title?.trim() || !source_tag?.trim()) {
     return json({ error: 'Nome, título e source tag são obrigatórios.' }, 422);
@@ -37,6 +40,10 @@ export const POST: APIRoute = async ({ request, locals }) => {
       subtitle: subtitle?.trim() || null,
       source_tag: tagClean,
       service_interest: service_interest?.trim() || null,
+      whatsapp_number: normalizeWhatsapp(whatsapp_number),
+      meta_title: meta_title?.trim() || null,
+      meta_description: meta_description?.trim() || null,
+      og_image: og_image?.trim() || null,
       questions: questions.value,
       success_message: success_message?.trim() || 'Obrigado! Entraremos em contato em breve.',
     })
@@ -77,6 +84,11 @@ export function normalizeQuestions(raw: unknown): { value: { text: string; optio
   }
 
   return { value };
+}
+
+// Só dígitos; vazio vira null para a página cair no número do escritório.
+export function normalizeWhatsapp(raw: string | null | undefined): string | null {
+  return (raw ?? '').replace(/\D/g, '') || null;
 }
 
 function json(body: unknown, status: number) {

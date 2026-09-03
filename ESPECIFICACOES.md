@@ -121,7 +121,8 @@ nemeseteibel/
 |   |   |   |-- index.astro           # dashboard
 |   |   |   |-- paginas.astro         # gerenciamento de paginas
 |   |   |   |-- formularios/index.astro # gerenciamento de formularios
-|   |   |   |-- quizzes.astro         # gerenciamento de quizzes
+|   |   |   |-- quizzes/index.astro   # gerenciamento de quizzes
+|   |   |   |-- quizzes/[id].astro    # respostas e distribuicao de um quiz
 |   |   |   |-- materiais.astro       # gerenciamento de materiais
 |   |   |   |-- usuarios.astro        # gerenciamento de admins
 |   |   |
@@ -272,6 +273,8 @@ Isso permite que o admin desative qualquer landing page, artigo ou pagina de per
 - Ultima etapa e o formulario de lead (nome + email/whatsapp), seguido da tela de sucesso
 - Suporta modo embed (`?embed=1`) para usar como iframe
 - Marca o inicio do funil em `/api/quizzes/[id]/start` e conclui em `/api/quizzes/[id]/submit`
+- Tela de sucesso tem botao de WhatsApp com as respostas ja escritas (numero por quiz, ou o do escritorio)
+- Open Graph completo para preview ao compartilhar (meta_title, meta_description, og_image)
 
 ### Pagina Indisponivel (`/indisponivel`)
 - Exibida quando uma pagina foi desativada pelo admin
@@ -322,13 +325,22 @@ Todas as paginas do admin sao SSR (`prerender = false`) e protegidas pelo middle
 ### Quizzes (`/admin/quizzes`)
 - **Criar quiz:** nome interno, source tag (auto-gerado), titulo publico, subtitulo, servico de interesse, mensagem de sucesso
 - **Builder de perguntas:** adicionar/remover perguntas, uma opcao por linha (minimo 2 opcoes por pergunta)
+- **Compartilhamento:** titulo, descricao e imagem do preview (WhatsApp, Instagram, Facebook, LinkedIn)
 - **Listar quizzes** com numero de perguntas e funil (inicio -> conclusao + taxa)
 - **Acoes por quiz:**
   - Copiar link publico (`/q/{id}`)
   - Copiar codigo iframe (para embed externo)
+  - Ver respostas (`/admin/quizzes/{id}`)
   - Editar perguntas e textos
   - Ativar/desativar
   - Excluir
+
+### Respostas de um quiz (`/admin/quizzes/[id]`)
+- **Funil:** quantos iniciaram, quantos concluiram e a taxa de conclusao
+- **Distribuicao por pergunta:** cada opcao com barra, percentual e contagem
+- **Respostas individuais:** data, lead (nome/email/telefone), respostas e status
+- A distribuicao e montada a partir do que foi gravado, nao das perguntas atuais:
+  editar o quiz depois nao apaga o historico (marcado como "pergunta removida")
 
 ### Materiais (`/admin/materiais`)
 - **Upload de material:** arrasta/solta ou seleciona arquivo (PDF, JPG, PNG, WebP, max 50MB)
@@ -457,6 +469,10 @@ Todos os endpoints sao SSR (`prerender = false`).
 | service_interest | text?    | Servico vinculado                       |
 | questions        | jsonb    | `[{ "text": "...", "options": [...] }]` |
 | success_message  | text     | Mensagem de sucesso apos envio          |
+| whatsapp_number  | text?    | Destino do botao de WhatsApp (so digitos). NULL = numero do escritorio |
+| meta_title       | text?    | Titulo do preview ao compartilhar. NULL = usa title |
+| meta_description | text?    | Descricao do preview. NULL = usa subtitle |
+| og_image         | text?    | Imagem do preview. NULL = /images/og-quiz.jpg |
 | is_active        | boolean  | Se o quiz esta ativo                    |
 | created_at       | timestamp| Data de criacao                         |
 
@@ -518,7 +534,9 @@ Todos os endpoints sao SSR (`prerender = false`).
 - `material_downloads`: insercao publica, leitura para admins
 - `forms`: leitura publica de formularios ativos, CRUD para admins
 - `quizzes`: leitura publica de quizzes ativos, CRUD para admins
-- `quiz_responses`: insercao publica e update das linhas iniciadas, leitura para admins
+- `quiz_responses`: sem acesso publico — escrita apenas pela service role nos endpoints
+  do quiz, leitura para admins. A anon key nao tem SELECT, entao qualquer insert com
+  RETURNING falharia com 42501 mesmo havendo policy de INSERT.
 - `page_settings`: leitura publica, escrita para admins
 
 ---

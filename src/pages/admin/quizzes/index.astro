@@ -16,6 +16,10 @@ interface Quiz {
   subtitle: string | null;
   source_tag: string;
   service_interest: string | null;
+  whatsapp_number: string | null;
+  meta_title: string | null;
+  meta_description: string | null;
+  og_image: string | null;
   questions: QuizQuestion[];
   success_message: string;
   is_active: boolean;
@@ -379,6 +383,15 @@ const siteUrl = Astro.url.origin;
     }
 
     .btn-iframe:hover { background: #EDE6D8; }
+
+    .btn-answers {
+      background: #ECFDF5;
+      color: #047857;
+      border-color: #A7F3D0;
+      text-decoration: none;
+    }
+
+    .btn-answers:hover { background: #D1FAE5; }
 
     .btn-edit {
       background: #FAF5FF;
@@ -854,6 +867,7 @@ const siteUrl = Astro.url.origin;
                       >
                         Iframe
                       </button>
+                      <a class="btn-action btn-answers" href={`/admin/quizzes/${q.id}`}>Respostas</a>
                       <button
                         class="btn-action btn-edit"
                         data-id={q.id}
@@ -862,6 +876,10 @@ const siteUrl = Astro.url.origin;
                           title: q.title,
                           subtitle: q.subtitle ?? '',
                           service_interest: q.service_interest ?? '',
+                          whatsapp_number: q.whatsapp_number ?? '',
+                          meta_title: q.meta_title ?? '',
+                          meta_description: q.meta_description ?? '',
+                          og_image: q.og_image ?? '',
                           success_message: q.success_message,
                           questions: q.questions,
                         })}
@@ -938,8 +956,39 @@ const siteUrl = Astro.url.origin;
           </div>
 
           <div class="form-group">
+            <label for="q-whatsapp">WhatsApp de destino</label>
+            <input type="text" id="q-whatsapp" placeholder="556541410010" />
+            <span class="form-hint">Botão na tela final. Em branco usa o número do escritório</span>
+          </div>
+
+          <div class="form-group">
             <label for="q-success">Mensagem de sucesso</label>
             <textarea id="q-success" placeholder="Obrigado! Entraremos em contato em breve."></textarea>
+          </div>
+
+          <div class="builder">
+            <div class="builder-header">
+              <div>
+                <h3>Compartilhamento</h3>
+                <p class="form-hint">O que aparece no preview ao mandar o link no WhatsApp</p>
+              </div>
+            </div>
+            <div class="form-grid" style="gap:1.1rem">
+              <div class="form-group">
+                <label for="q-meta-title">Título do preview</label>
+                <input type="text" id="q-meta-title" placeholder="Sua propriedade rural está regularizada?" />
+                <span class="form-hint">Em branco usa o título público, que é o texto da última etapa — quase sempre ruim aqui</span>
+              </div>
+              <div class="form-group">
+                <label for="q-meta-description">Descrição do preview</label>
+                <textarea id="q-meta-description" placeholder="5 perguntas rápidas. Uma advogada especialista analisa seu caso."></textarea>
+              </div>
+              <div class="form-group">
+                <label for="q-og-image">Imagem do preview</label>
+                <input type="text" id="q-og-image" placeholder="/images/og-quiz.jpg" />
+                <span class="form-hint">Caminho do site ou URL completa. Em branco usa a imagem padrão dos quizzes</span>
+              </div>
+            </div>
           </div>
 
           <div class="builder">
@@ -1117,6 +1166,10 @@ const siteUrl = Astro.url.origin;
       const subtitle = input('q-subtitle').value.trim() || null;
       const sourceTag = input('q-source-tag').value.trim();
       const service = input('q-service').value.trim() || null;
+      const whatsapp = input('q-whatsapp').value.trim() || null;
+      const metaTitle = input('q-meta-title').value.trim() || null;
+      const metaDescription = (document.getElementById('q-meta-description') as HTMLTextAreaElement).value.trim() || null;
+      const ogImage = input('q-og-image').value.trim() || null;
       const successMsg = (document.getElementById('q-success') as HTMLTextAreaElement).value.trim()
         || 'Obrigado! Entraremos em contato em breve.';
 
@@ -1141,6 +1194,10 @@ const siteUrl = Astro.url.origin;
         title,
         subtitle,
         service_interest: service,
+        whatsapp_number: whatsapp,
+        meta_title: metaTitle,
+        meta_description: metaDescription,
+        og_image: ogImage,
         success_message: successMsg,
         questions,
       };
@@ -1191,6 +1248,10 @@ const siteUrl = Astro.url.origin;
       input('q-title').value = quiz.title ?? '';
       input('q-subtitle').value = quiz.subtitle ?? '';
       input('q-service').value = quiz.service_interest ?? '';
+      input('q-whatsapp').value = quiz.whatsapp_number ?? '';
+      input('q-meta-title').value = quiz.meta_title ?? '';
+      (document.getElementById('q-meta-description') as HTMLTextAreaElement).value = quiz.meta_description ?? '';
+      input('q-og-image').value = quiz.og_image ?? '';
       (document.getElementById('q-success') as HTMLTextAreaElement).value = quiz.success_message ?? '';
 
       questionsList.innerHTML = '';
