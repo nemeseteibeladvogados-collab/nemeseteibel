@@ -1,0 +1,228 @@
+---
+// src/pages/politica-de-privacidade.astro
+// Política de Privacidade — LGPD (Lei nº 13.709/2018)
+// Página estática (prerender padrão do output hybrid). Linkada no rodapé do site,
+// no rodapé das landing pages e junto ao formulário da cartilha.
+import Layout from '../layouts/Layout.astro';
+
+const ATUALIZADA_EM = '10 de novembro de 2026';
+---
+
+<Layout
+  title="Política de Privacidade | Nemes & Teibel Advogados"
+  description="Como o escritório Nemes & Teibel Advogados coleta, usa e protege os dados pessoais de quem acessa o site e preenche os formulários, nos termos da LGPD."
+>
+  <article class="privacy">
+    <div class="container privacy-inner">
+
+      <header class="privacy-header">
+        <p class="privacy-eyebrow">LGPD — Lei nº 13.709/2018</p>
+        <h1 class="privacy-title">Política de Privacidade</h1>
+        <p class="privacy-updated">Última atualização: {ATUALIZADA_EM}</p>
+      </header>
+
+      <section class="privacy-section">
+        <h2>1. Quem somos</h2>
+        <p>
+          Este site é mantido por <strong>Nemes &amp; Teibel Advogados</strong>, sociedade de advogados
+          inscrita no CNPJ sob o nº 32.181.460/0001-50, com sede na Av. Historiador Rubens de Mendonça,
+          2368, Bosque da Saúde, Cuiabá/MT, CEP 78050-000. Para os fins da Lei Geral de Proteção de
+          Dados Pessoais (LGPD), o escritório é o <strong>controlador</strong> dos dados pessoais
+          tratados por meio deste site.
+        </p>
+      </section>
+
+      <section class="privacy-section">
+        <h2>2. Quais dados coletamos</h2>
+        <p>Coletamos apenas o necessário para atender ao que você solicita:</p>
+        <ul>
+          <li>
+            <strong>Dados que você informa nos formulários:</strong> nome, e-mail e/ou número de
+            WhatsApp, quando você solicita um material (como a cartilha de compra e venda de imóvel
+            rural), responde a um questionário ou pede contato. Em alguns formulários, uma mensagem
+            livre que você escreve.
+          </li>
+          <li>
+            <strong>Dados de navegação:</strong> endereço IP, tipo de navegador, páginas visitadas,
+            origem do acesso e identificadores de cookies, coletados automaticamente pelas ferramentas
+            descritas no item 5.
+          </li>
+        </ul>
+        <p>
+          Não coletamos dados sensíveis pelo site. Informações sobre o seu caso só são tratadas depois
+          do contato direto com o escritório e ficam protegidas pelo sigilo profissional da advocacia.
+        </p>
+      </section>
+
+      <section class="privacy-section">
+        <h2>3. Para que usamos os dados</h2>
+        <ul>
+          <li>Enviar o material que você solicitou e responder ao seu contato.</li>
+          <li>Entrar em contato, pelo canal que você escolheu, para falar sobre o tema do seu interesse.</li>
+          <li>Entender como o site é usado e medir o resultado das páginas e dos anúncios.</li>
+          <li>Cumprir obrigações legais e exercer direitos do escritório, quando necessário.</li>
+        </ul>
+        <p>
+          <strong>Bases legais:</strong> execução de procedimentos preliminares a pedido do titular
+          (art. 7º, V, da LGPD), consentimento (art. 7º, I), quando você marca a opção de receber
+          contato, e legítimo interesse do escritório (art. 7º, IX) para a medição de audiência,
+          sempre respeitando as suas expectativas e os seus direitos.
+        </p>
+      </section>
+
+      <section class="privacy-section">
+        <h2>4. Com quem compartilhamos</h2>
+        <p>
+          Não vendemos nem cedemos dados pessoais. Os dados podem ser tratados por fornecedores que
+          prestam serviços ao escritório, sempre na condição de operadores e limitados à finalidade
+          contratada:
+        </p>
+        <ul>
+          <li><strong>Vercel</strong> — hospedagem do site.</li>
+          <li><strong>Supabase</strong> — banco de dados onde os cadastros dos formulários ficam armazenados.</li>
+          <li><strong>Google</strong> (Google Ads) — medição de conversões dos anúncios.</li>
+          <li><strong>Meta</strong> (Instagram) — exibição de vídeos incorporados nas páginas.</li>
+          <li><strong>Major Hub</strong> — ferramenta de medição de acessos ao site.</li>
+        </ul>
+        <p>
+          Alguns desses fornecedores podem armazenar dados fora do Brasil. Nesses casos, a transferência
+          internacional observa o art. 33 da LGPD.
+        </p>
+      </section>
+
+      <section class="privacy-section">
+        <h2>5. Cookies e ferramentas de medição</h2>
+        <p>
+          O site usa cookies e identificadores semelhantes das ferramentas acima para reconhecer visitas,
+          medir cliques nos botões de contato e avaliar o desempenho dos anúncios. Você pode bloquear ou
+          apagar cookies nas configurações do seu navegador; o site continua funcionando, mas algumas
+          medições deixam de ser feitas.
+        </p>
+      </section>
+
+      <section class="privacy-section">
+        <h2>6. Por quanto tempo guardamos</h2>
+        <p>
+          Os dados dos formulários ficam armazenados enquanto houver relação com o escritório ou interesse
+          legítimo em manter o contato, e são eliminados quando deixam de ser necessários ou quando você
+          pedir, salvo quando a lei exigir a guarda por mais tempo. Dados de navegação seguem os prazos
+          das ferramentas de medição.
+        </p>
+      </section>
+
+      <section class="privacy-section">
+        <h2>7. Seus direitos</h2>
+        <p>Nos termos do art. 18 da LGPD, você pode, a qualquer momento, pedir ao escritório:</p>
+        <ul>
+          <li>confirmação de que tratamos seus dados e acesso a eles;</li>
+          <li>correção de dados incompletos, inexatos ou desatualizados;</li>
+          <li>anonimização, bloqueio ou eliminação de dados desnecessários ou excessivos;</li>
+          <li>portabilidade, nos termos da regulamentação da ANPD;</li>
+          <li>informação sobre com quem compartilhamos seus dados;</li>
+          <li>revogação do consentimento e eliminação dos dados tratados com base nele.</li>
+        </ul>
+        <p>
+          Para exercer esses direitos, escreva para
+          <a href="mailto:nemeseteibeladvogados@hotmail.com">nemeseteibeladvogados@hotmail.com</a>
+          ou fale conosco pelo WhatsApp (65) 4141-0010. Respondemos no prazo da lei. Você também pode
+          apresentar reclamação à Autoridade Nacional de Proteção de Dados (ANPD).
+        </p>
+      </section>
+
+      <section class="privacy-section">
+        <h2>8. Segurança</h2>
+        <p>
+          Adotamos medidas técnicas e administrativas para proteger os dados contra acessos não
+          autorizados, perda ou alteração, como conexão criptografada (HTTPS), controle de acesso ao
+          banco de dados e restrição de quem, dentro do escritório, pode consultar os cadastros.
+        </p>
+      </section>
+
+      <section class="privacy-section">
+        <h2>9. Alterações desta política</h2>
+        <p>
+          Esta política pode ser atualizada para refletir mudanças no site ou na legislação. A data da
+          última atualização aparece no topo da página.
+        </p>
+      </section>
+
+    </div>
+  </article>
+</Layout>
+
+<style>
+  .privacy {
+    background: var(--color-bg);
+    padding: clamp(3rem, 7vw, 5rem) 0 clamp(4rem, 8vw, 6rem);
+  }
+  .privacy-inner {
+    max-width: 780px;
+  }
+  .privacy-header {
+    margin-bottom: 2.5rem;
+    padding-bottom: 1.75rem;
+    border-bottom: 1px solid rgba(58, 52, 38, 0.12);
+  }
+  .privacy-eyebrow {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--color-accent-gold);
+    margin-bottom: 0.75rem;
+  }
+  .privacy-title {
+    font-family: var(--font-heading);
+    font-size: clamp(1.9rem, 4.5vw, 2.75rem);
+    font-weight: 700;
+    color: var(--color-secondary);
+    line-height: 1.15;
+    margin-bottom: 0.75rem;
+  }
+  .privacy-updated {
+    font-size: 0.85rem;
+    color: var(--color-text-light);
+  }
+  .privacy-section {
+    margin-bottom: 2.25rem;
+  }
+  .privacy-section h2 {
+    font-family: var(--font-heading);
+    font-size: clamp(1.2rem, 2.4vw, 1.45rem);
+    font-weight: 700;
+    color: var(--color-secondary);
+    margin-bottom: 0.85rem;
+    line-height: 1.3;
+  }
+  .privacy-section p {
+    font-size: 1rem;
+    color: var(--color-text-light);
+    line-height: 1.8;
+    margin-bottom: 0.9rem;
+  }
+  .privacy-section p:last-child {
+    margin-bottom: 0;
+  }
+  .privacy-section strong {
+    color: var(--color-secondary);
+    font-weight: 600;
+  }
+  .privacy-section ul {
+    list-style: disc;
+    padding-left: 1.4rem;
+    margin-bottom: 0.9rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .privacy-section li {
+    font-size: 1rem;
+    color: var(--color-text-light);
+    line-height: 1.7;
+  }
+  .privacy-section a {
+    color: var(--color-accent-dark);
+    text-decoration: underline;
+    overflow-wrap: anywhere;
+  }
+</style>
