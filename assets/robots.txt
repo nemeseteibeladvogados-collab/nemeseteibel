@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api/
+Disallow: /indisponivel
+
+Sitemap: https://www.nemeseteibeladv.com.br/sitemap.xml
