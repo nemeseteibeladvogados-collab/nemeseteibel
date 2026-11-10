@@ -35,6 +35,9 @@ const ogImageURL   = new URL(ogImage, Astro.site);
     gtag('js', new Date());
 
     gtag('config', 'AW-17888765664');
+    // Tag da conta Google Ads 989-176-7615 (NEMES & TEIBEL ADVOGADOS). A tag acima
+    // pertence a outra conta, por isso as conversões desta nunca eram registradas.
+    gtag('config', 'AW-18470575549');
   </script>
 
   <title>{title}</title>
@@ -84,6 +87,22 @@ const ogImageURL   = new URL(ogImage, Astro.site);
       <path d="M12 0C5.373 0 0 5.373 0 12c0 2.139.563 4.14 1.541 5.876L.057 23.887l6.156-1.616A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.8 9.8 0 01-4.992-1.363l-.358-.213-3.716.975.993-3.63-.234-.373A9.77 9.77 0 012.182 12c0-5.42 4.398-9.818 9.818-9.818 5.42 0 9.818 4.398 9.818 9.818 0 5.42-4.398 9.818-9.818 9.818z"/>
     </svg>
   </a>
+
+  <!-- Conversão do Google Ads: clique em qualquer link do WhatsApp da landing page -->
+  <script is:inline>
+    (function () {
+      var SEND_TO = 'AW-18470575549/l09ICICM6rUdEL27uudE'; // ação "Clique no WhatsApp"
+      document.addEventListener('click', function (e) {
+        var el = e.target instanceof Element ? e.target.closest('a[href*="wa.me/"]') : null;
+        if (!el || typeof window.gtag !== 'function') return;
+        window.gtag('event', 'conversion', {
+          send_to: SEND_TO,
+          event_category: 'whatsapp',
+          event_label: window.location.pathname,
+        });
+      }, true);
+    })();
+  </script>
 
   <script>
     const observer = new IntersectionObserver(
