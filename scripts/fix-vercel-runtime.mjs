@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, readdirSync, statSync } from 'fs';
+import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from 'fs';
 import { join } from 'path';
 
 const OUTPUT = join(process.cwd(), '.vercel', 'output', 'functions');
@@ -18,4 +18,5 @@ function walk(dir) {
   }
 }
 
-walk(OUTPUT);
+// Só existe em build da Vercel; fora dela (adaptador Node) não há o que corrigir.
+if (process.env.VERCEL && existsSync(OUTPUT)) walk(OUTPUT);
