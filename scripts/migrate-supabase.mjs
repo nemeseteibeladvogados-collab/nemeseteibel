@@ -26,6 +26,8 @@ const TABELAS = [
   { nome: 'quiz_responses', pk: 'id' },
 ];
 
+const TIPOS = { int32: 'integer', int64: 'bigint', float: 'real', double: 'double precision' };
+
 function lerEnv(arquivo) {
   if (!existsSync(arquivo)) {
     console.error(`\nArquivo ${arquivo} não encontrado.\n`);
@@ -67,7 +69,8 @@ async function colunas(env) {
   const out = {};
   for (const [tabela, def] of Object.entries(spec.definitions ?? {})) {
     out[tabela] = Object.entries(def.properties ?? {})
-      .map(([col, p]) => `${col}:${p.format ?? p.type}`)
+      // Versões diferentes do PostgREST dão nomes diferentes ao mesmo tipo.
+      .map(([col, p]) => `${col}:${TIPOS[p.format ?? p.type] ?? p.format ?? p.type}`)
       .sort();
   }
   return out;

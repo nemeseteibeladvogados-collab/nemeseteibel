@@ -1,6 +1,9 @@
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from 'fs';
 import { join } from 'path';
 
+// O @astrojs/vercel 7 grava um runtime antigo (nodejs18.x) nas funções.
+// A Vercel descontinuou o 18 e o 20, então trocamos pelo 22.
+const RUNTIME = 'nodejs22.x';
 const OUTPUT = join(process.cwd(), '.vercel', 'output', 'functions');
 
 function walk(dir) {
@@ -10,9 +13,10 @@ function walk(dir) {
       walk(full);
     } else if (entry === '.vc-config.json') {
       const raw = readFileSync(full, 'utf-8');
-      if (raw.includes('nodejs18.x')) {
-        writeFileSync(full, raw.replace(/nodejs18\.x/g, 'nodejs20.x'));
-        console.log(`[fix-runtime] ${full} → nodejs20.x`);
+      const fixed = raw.replace(/nodejs\d+\.x/g, RUNTIME);
+      if (fixed !== raw) {
+        writeFileSync(full, fixed);
+        console.log(`[fix-runtime] ${full} → ${RUNTIME}`);
       }
     }
   }
